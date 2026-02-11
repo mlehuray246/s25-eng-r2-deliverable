@@ -1,0 +1,145 @@
+name,diet,speed
+Bald Eagle,carnivore,120.0
+Cheetah,carnivore,112.0
+Pronghorn,herbivore,88.5
+Snowy Owl,carnivore,80.0
+Iberian Lynx,carnivore,75.0
+Arabian Horse,herbivore,65.0
+Bengal Tiger,carnivore,65.0
+Boxer Dog,omnivore,64.0
+Grevy's Zebra,herbivore,64.0
+Wolverine,carnivore,63.0
+Common Dolphin,carnivore,60.0
+Sperm Whale,carnivore,60.0
+Alpine Ibex,herbivore,60.0
+Spotted Hyena,carnivore,60.0
+Arctic Fox,omnivore,60.0
+African Lion,carnivore,58.0
+Okapi,herbivore,58.0
+Siberian Husky,carnivore,57.5
+Great White Shark,carnivore,56.0
+African Wild Dog,carnivore,56.0
+Red Kangaroo,herbivore,56.0
+Dhole,carnivore,56.0
+Maned Wolf,omnivore,56.0
+Tasmanian Tiger,carnivore,56.0
+Black Rhinoceros,herbivore,56.0
+Dingo,carnivore,56.0
+Gerenuk,herbivore,55.0
+Arabian Oryx,herbivore,55.0
+Markhor,herbivore,52.0
+Atlantic Spotted Dolphin,carnivore,52.0
+Bearded Dragon,omnivore,52.0
+Bornean Orangutan,omnivore,52.0
+Sumatran Rhinoceros,herbivore,52.0
+Bonobo,omnivore,50.0
+Harpy Eagle,carnivore,50.0
+Snow Leopard,carnivore,50.0
+Japanese Giant Hornet,carnivore,49.0
+American Bison,herbivore,48.0
+Tapir,herbivore,48.0
+Baird's Tapir,herbivore,48.0
+Red Fox,omnivore,48.0
+Brown Bear,omnivore,48.0
+Wildebeest,herbivore,47.0
+Fossa,carnivore,46.5
+Spider Monkey,omnivore,45.0
+Flying Fox,herbivore,45.0
+Shortfin Mako Shark,carnivore,45.0
+Spectacled Bear,omnivore,45.0
+Tibetan Mastiff,omnivore,45.0
+White Rhinoceros,herbivore,45.0
+Narwhal,carnivore,45.0
+Wolf,carnivore,45.0
+Serval,carnivore,44.0
+Sun Bear,omnivore,44.0
+Dalmatian Dog,omnivore,42.5
+Sumatran Rhino,herbivore,40.0
+Chimpanzee,omnivore,40.0
+Atlantic Puffin,carnivore,40.0
+Asian Elephant,herbivore,40.0
+Mantis Shrimp,carnivore,40.0
+Western Gorilla,herbivore,40.0
+Western Lowland Gorilla,herbivore,40.0
+Eastern Gorilla,herbivore,40.0
+Bengal Fox,omnivore,40.0
+Polar Bear,carnivore,40.0
+Mountain Gorilla,herbivore,40.0
+Coquerel's Sifaka,herbivore,37.5
+Bottlenose Dolphin,carnivore,37.0
+Toco Toucan,omnivore,35.5
+Gaur,herbivore,35.0
+Rottweiler,carnivore,35.0
+Sumatran Orangutan,omnivore,35.0
+Green Sea Turtle,herbivore,35.0
+Capybara,herbivore,32.5
+Fennec Fox,omnivore,32.0
+Blue Jay,omnivore,32.0
+Meerkat,omnivore,32.0
+Vampire Bat,carnivore,32.0
+Giant Panda,herbivore,32.0
+Australian Fur Seal,carnivore,32.0
+Aye-Aye,omnivore,32.0
+Emperor Tamarin,omnivore,32.0
+Gharial,carnivore,32.0
+Patagonian Mara,herbivore,30.0
+Squirrel Monkey,omnivore,30.0
+Tree Kangaroo,herbivore,30.0
+Barbary Macaque,herbivore,30.0
+Japanese Macaque,omnivore,30.0
+GalÃ¡pagos Penguin,carnivore,29.5
+Lemur,herbivore,29.0
+Proboscis Monkey,herbivore,28.0
+Tiger,carnivore,28.0
+Titanoboa,carnivore,27.0
+Saola,herbivore,26.0
+Humpback Whale,omnivore,25.5
+Indri,herbivore,25.5
+African Elephant,herbivore,25.0
+Yellow-Eyed Penguin,carnivore,25.0
+Hippopotamus,herbivore,25.0
+Zebra,herbivore,25.0
+Arowana,carnivore,24.0
+Yak,herbivore,24.0
+Secretary Bird,carnivore,24.0
+Giant Pacific Octopus,carnivore,24.0
+Quokka,herbivore,24.0
+White Tiger,carnivore,22.0
+Harp Seal,carnivore,20.5
+Zebra Shark,carnivore,20.0
+Uakari,omnivore,20.0
+Komodo Dragon,carnivore,20.0
+Wombat,herbivore,20.0
+King Cobra,carnivore,20.0
+Green Anaconda,carnivore,20.0
+Three-Toed Sloth,herbivore,20.0
+Wild Boar,omnivore,20.0
+Tufted Puffin,carnivore,17.0
+Banded Palm Civet,omnivore,16.0
+Tasmanian Devil,carnivore,16.0
+Kangaroo Rat,herbivore,16.0
+Shoebill,carnivore,15.0
+Dugong,herbivore,12.5
+Golden Lion Tamarin,omnivore,10.5
+Orangutan,omnivore,9.0
+Kiwi,omnivore,8.0
+Pufferfish,carnivore,8.0
+Manatee,herbivore,8.0
+Clownfish,omnivore,8.0
+European Hedgehog,omnivore,5.0
+Kakapo,herbivore,2.5
+Goblin Shark,carnivore,2.3
+Emperor Penguin,carnivore,2.25
+Burmese Python,carnivore,2.0
+Coelacanth,carnivore,1.6
+Gila Monster,carnivore,1.5
+Horseshoe Crab,carnivore,1.2000000000000002
+Axolotl,carnivore,0.8
+Fire Salamander,carnivore,0.8
+Praying Mantis,carnivore,0.6
+Galápagos Tortoise,herbivore,0.4
+Red Panda,herbivore,0.30000000000000004
+Sloth,herbivore,0.135
+Naked Mole Rat,herbivore,0.055
+Tuatara,carnivore,0.03
+Lyrebird,omnivore,0.025
