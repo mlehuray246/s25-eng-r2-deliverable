@@ -26,10 +26,7 @@ export default async function SpeciesListPage() {
     .order("id", { ascending: false })
     .returns<SpeciesRow[]>();
 
-  if (error) {
-    // You can render a nicer error state if you want
-    throw new Error(error.message);
-  }
+  if (error) throw new Error(error.message);
 
   return (
     <>

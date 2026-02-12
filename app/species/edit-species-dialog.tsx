@@ -18,25 +18,23 @@ import { createBrowserSupabaseClient } from "@/lib/client-utils";
 import type { Database } from "@/lib/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import type { BaseSyntheticEvent, ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useState, type BaseSyntheticEvent, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-type SpeciesRow = Database["public"]["Tables"]["species"]["Row"];
-
 const kingdoms = z.enum(["Animalia", "Plantae", "Fungi", "Protista", "Archaea", "Bacteria"]);
 
-const formSchema = z.object({
-  scientific_name: z.string().trim().min(1).transform((v) => v.trim()),
-  common_name: z.string().nullable().transform((v) => (!v || v.trim() === "" ? null : v.trim())),
+const speciesSchema = z.object({
+  scientific_name: z.string().trim().min(1).transform((val) => val.trim()),
+  common_name: z.string().nullable().transform((val) => (!val || val.trim() === "" ? null : val.trim())),
   kingdom: kingdoms,
-  total_population: z.number().int().positive().nullable(),
-  image: z.string().url().nullable().transform((v) => (!v || v.trim() === "" ? null : v.trim())),
-  description: z.string().nullable().transform((v) => (!v || v.trim() === "" ? null : v.trim())),
+  total_population: z.number().int().positive().min(1).nullable(),
+  image: z.string().url().nullable().transform((val) => (!val || val.trim() === "" ? null : val.trim())),
+  description: z.string().nullable().transform((val) => (!val || val.trim() === "" ? null : val.trim())),
 });
 
-type FormData = z.infer<typeof formSchema>;
+type FormData = z.infer<typeof speciesSchema>;
+type SpeciesRow = Database["public"]["Tables"]["species"]["Row"];
 
 export default function EditSpeciesDialog({
   species,
@@ -47,39 +45,40 @@ export default function EditSpeciesDialog({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const defaultValues: Partial<FormData> = useMemo(
-    () => ({
+  const form = useForm<FormData>({
+    resolver: zodResolver(speciesSchema),
+    defaultValues: {
       scientific_name: species.scientific_name ?? "",
       common_name: species.common_name ?? null,
-      kingdom: (species.kingdom as FormData["kingdom"]) ?? "Animalia",
+      kingdom: kingdoms.parse(species.kingdom ?? "Animalia"),
       total_population: species.total_population ?? null,
       image: species.image ?? null,
       description: species.description ?? null,
-    }),
-    [species]
-  );
-
-  const form = useForm<FormData>({
-    resolver: zodResolver(formSchema),
-    defaultValues,
+    },
     mode: "onChange",
   });
 
-  const onSubmit = async (values: FormData) => {
+  const onSubmit = async (input: FormData) => {
+    if (saving) return;
+    setSaving(true);
+
     const supabase = createBrowserSupabaseClient();
 
     const { error } = await supabase
       .from("species")
       .update({
-        scientific_name: values.scientific_name,
-        common_name: values.common_name,
-        kingdom: values.kingdom,
-        total_population: values.total_population,
-        image: values.image,
-        description: values.description,
+        scientific_name: input.scientific_name,
+        common_name: input.common_name,
+        kingdom: input.kingdom,
+        total_population: input.total_population,
+        image: input.image,
+        description: input.description,
       })
       .eq("id", species.id);
+
+    setSaving(false);
 
     if (error) {
       console.error(error);
@@ -91,13 +90,13 @@ export default function EditSpeciesDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(v) => !saving && setOpen(v)}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
 
       <DialogContent className="max-h-screen overflow-y-auto sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>Edit species</DialogTitle>
-          <DialogDescription>Update this species. Click “Save Changes” when you’re done.</DialogDescription>
+          <DialogTitle>Edit Species</DialogTitle>
+          <DialogDescription>Update the species details below.</DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -108,7 +107,7 @@ export default function EditSpeciesDialog({
                 name="scientific_name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Scientific name</FormLabel>
+                    <FormLabel>Scientific Name</FormLabel>
                     <FormControl>
                       <Input placeholder="Cavia porcellus" {...field} />
                     </FormControl>
@@ -124,7 +123,7 @@ export default function EditSpeciesDialog({
                   const { value, ...rest } = field;
                   return (
                     <FormItem>
-                      <FormLabel>Common name</FormLabel>
+                      <FormLabel>Common Name</FormLabel>
                       <FormControl>
                         <Input value={value ?? ""} placeholder="Guinea pig" {...rest} />
                       </FormControl>
@@ -140,7 +139,7 @@ export default function EditSpeciesDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Kingdom</FormLabel>
-                    <Select onValueChange={(v) => field.onChange(kingdoms.parse(v))} value={field.value}>
+                    <Select onValueChange={(value) => field.onChange(kingdoms.parse(value))} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select a kingdom" />
@@ -148,9 +147,9 @@ export default function EditSpeciesDialog({
                       </FormControl>
                       <SelectContent>
                         <SelectGroup>
-                          {kingdoms.options.map((k) => (
-                            <SelectItem key={k} value={k}>
-                              {k}
+                          {kingdoms.options.map((kingdom) => (
+                            <SelectItem key={kingdom} value={kingdom}>
+                              {kingdom}
                             </SelectItem>
                           ))}
                         </SelectGroup>
@@ -221,11 +220,11 @@ export default function EditSpeciesDialog({
               />
 
               <div className="flex">
-                <Button type="submit" className="ml-1 mr-1 flex-auto">
-                  Save Changes
+                <Button type="submit" className="ml-1 mr-1 flex-auto" disabled={saving}>
+                  {saving ? "Saving…" : "Save Changes"}
                 </Button>
                 <DialogClose asChild>
-                  <Button type="button" className="ml-1 mr-1 flex-auto" variant="secondary">
+                  <Button type="button" className="ml-1 mr-1 flex-auto" variant="secondary" disabled={saving}>
                     Cancel
                   </Button>
                 </DialogClose>

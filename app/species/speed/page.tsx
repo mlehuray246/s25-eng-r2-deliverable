@@ -1,15 +1,10 @@
 import AnimalSpeedGraph from "../animal-speed-graph";
 
-export default function SpeedPage() {
+export default function GraphPage() {
   return (
-    <div className="w-full">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
-        <h2 className="text-2xl font-semibold">Species Speed</h2>
-      </div>
-
-      <div className="rounded border p-4">
-        <AnimalSpeedGraph />
-      </div>
+    <div className="mx-auto w-full max-w-6xl p-4">
+      <h1 className="mb-4 text-2xl font-semibold">Animal Speed Graph</h1>
+      <AnimalSpeedGraph />
     </div>
   );
 }

@@ -1,23 +1,26 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Trash2, ArrowDownUp, RefreshCw } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowDownUp, RefreshCw } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+
+/* ----------------------------- Config ----------------------------- */
+const CSV_URL = "/sample_animals.csv"; // must exist in /public
 
 /* ----------------------------- Types ----------------------------- */
-
 type Row = Record<string, string | number | null>;
 
-/* ----------------------------- CSV Parser ----------------------------- */
+interface ChartDatum {
+  name: string;
+  value: number;
+  group: string; // herbivore/omnivore/carnivore/etc
+  raw: Row;
+}
 
+/* ----------------------------- CSV Parser ----------------------------- */
 function parseCSV(text: string): { rows: Row[]; headers: string[] } {
   const rows: string[][] = [];
   let cur = "";
@@ -47,24 +50,20 @@ function parseCSV(text: string): { rows: Row[]; headers: string[] } {
       i++;
       continue;
     }
-
     if (ch === '"') {
       inQuotes = !inQuotes;
       continue;
     }
-
     if (!inQuotes && ch === ",") {
       pushCell();
       continue;
     }
-
     if (!inQuotes && (ch === "\n" || ch === "\r")) {
       if (ch === "\r" && next === "\n") i++;
       pushCell();
       pushRow();
       continue;
     }
-
     cur += ch;
   }
 
@@ -89,6 +88,12 @@ function parseCSV(text: string): { rows: Row[]; headers: string[] } {
 }
 
 /* ----------------------------- Helpers ----------------------------- */
+function niceLabel(s: string) {
+  return s
+    .replace(/_/g, " ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .trim();
+}
 
 function toNumberLoose(v: unknown): number | null {
   if (v == null) return null;
@@ -106,15 +111,82 @@ function toNumberLoose(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function niceLabel(s: string) {
-  return s
-    .replace(/_/g, " ")
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .trim();
+function pickDefaultName(headers: string[]) {
+  const candidates = ["name", "animal", "species", "common_name", "scientific_name"];
+  return headers.find((h) => candidates.includes(h.toLowerCase())) ?? headers[0] ?? "";
+}
+
+function pickDefaultValue(headers: string[], rows: Row[]) {
+  return (
+    headers.find((h) => h.toLowerCase().includes("speed")) ??
+    headers.find((h) => rows.some((r) => toNumberLoose(r[h]) != null)) ??
+    ""
+  );
+}
+
+function pickDefaultGroup(headers: string[]) {
+  const candidates = ["diet", "type", "trophic_level", "feeding", "category"];
+  return headers.find((h) => candidates.includes(h.toLowerCase())) ?? "__none__";
+}
+
+function normalizeGroup(v: unknown) {
+  const s = String(v ?? "")
+    .trim()
+    .toLowerCase();
+  if (!s) return "unknown";
+  if (s.includes("herb")) return "herbivore";
+  if (s.includes("omni")) return "omnivore";
+  if (s.includes("carn")) return "carnivore";
+  if (s.includes("insect")) return "insectivore";
+  if (s.includes("pisc")) return "piscivore";
+  if (s.includes("frug")) return "frugivore";
+  return s;
+}
+
+function truncate(s: string, max = 10) {
+  if (s.length <= max) return s;
+  return s.slice(0, max) + "…";
+}
+
+/* ----------------------------- Gentle Palette ----------------------------- */
+// Soft, “pastel-ish” but still readable on light/dark backgrounds.
+const GROUP_COLOR: Record<string, string> = {
+  herbivore: "#86efac", // soft green
+  omnivore: "#fde68a", // soft amber
+  carnivore: "#fca5a5", // soft red
+  insectivore: "#ddd6fe", // soft violet
+  piscivore: "#93c5fd", // soft blue
+  frugivore: "#99f6e4", // soft teal
+  unknown: "#cbd5e1", // soft slate
+};
+
+const FALLBACK = ["#bfdbfe", "#bbf7d0", "#fde68a", "#fecaca", "#ddd6fe", "#99f6e4", "#cbd5e1"];
+
+function getColor(group: string, idx: number) {
+  return GROUP_COLOR[group] ?? FALLBACK[idx % FALLBACK.length];
+}
+
+/* ----------------------------- Tooltip ----------------------------- */
+function CustomTooltip({ active, payload }: { active?: boolean; payload?: any[] }) {
+  if (!active || !payload?.length) return null;
+  const p = payload[0]?.payload as ChartDatum | undefined;
+  if (!p) return null;
+
+  return (
+    <div className="rounded-lg border bg-background p-3 shadow-sm">
+      <div className="text-sm font-semibold">{p.name}</div>
+      <div className="mt-1 text-xs text-muted-foreground">
+        Value: <span className="font-semibold text-foreground">{p.value}</span>
+      </div>
+      <div className="mt-1 text-xs text-muted-foreground">
+        Type: <span className="font-semibold capitalize text-foreground">{p.group}</span>
+      </div>
+      <div className="mt-1 text-[11px] text-muted-foreground">Tip: click bar to hide</div>
+    </div>
+  );
 }
 
 /* ----------------------------- Component ----------------------------- */
-
 export default function AnimalSpeedGraph() {
   const [rows, setRows] = useState<Row[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
@@ -123,17 +195,21 @@ export default function AnimalSpeedGraph() {
 
   const [nameKey, setNameKey] = useState("");
   const [valueKey, setValueKey] = useState("");
+  const [groupKey, setGroupKey] = useState<string>("__none__");
 
   const [search, setSearch] = useState("");
+  const [filterKey, setFilterKey] = useState<string>("__none__");
+  const [filterValue, setFilterValue] = useState<string>("__all__");
   const [sortDesc, setSortDesc] = useState(true);
-  const [topN, setTopN] = useState(30);
-  const [deleted, setDeleted] = useState<Set<string>>(new Set());
+  const [topN, setTopN] = useState(15);
+
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch("/sample_animals.csv", { cache: "no-store" });
-        if (!res.ok) throw new Error("Failed to fetch /sample_animals.csv");
+        const res = await fetch(CSV_URL, { cache: "no-store" });
+        if (!res.ok) throw new Error(`Failed to fetch ${CSV_URL}`);
 
         const text = await res.text();
         const parsed = parseCSV(text);
@@ -141,175 +217,280 @@ export default function AnimalSpeedGraph() {
         setRows(parsed.rows);
         setHeaders(parsed.headers);
 
-        const defaultName =
-          parsed.headers.find((h) =>
-            ["name", "animal", "species", "common_name"].includes(h.toLowerCase())
-          ) ?? parsed.headers[0];
-
-        const defaultValue =
-          parsed.headers.find((h) => h.toLowerCase().includes("speed")) ??
-          parsed.headers.find((h) => parsed.rows.some((r) => toNumberLoose(r[h]) != null)) ??
-          "";
-
-        setNameKey(defaultName ?? "");
-        setValueKey(defaultValue ?? "");
+        setNameKey(pickDefaultName(parsed.headers));
+        setValueKey(pickDefaultValue(parsed.headers, parsed.rows));
+        setGroupKey(pickDefaultGroup(parsed.headers));
       } catch (e: any) {
         setError(e?.message ?? "Failed to load CSV");
       } finally {
         setLoading(false);
       }
     }
-
     load();
   }, []);
 
-  const numericHeaders = useMemo(() => {
-    return headers.filter((h) => rows.some((r) => toNumberLoose(r[h]) != null));
-  }, [headers, rows]);
+  const numericHeaders = useMemo(
+    () => headers.filter((h) => rows.some((r) => toNumberLoose(r[h]) != null)),
+    [headers, rows],
+  );
 
-  const data = useMemo(() => {
+  const filterableHeaders = useMemo(
+    () => headers.filter((h) => rows.some((r) => String(r[h] ?? "").trim() !== "")),
+    [headers, rows],
+  );
+
+  const filterValues = useMemo(() => {
+    if (filterKey === "__none__") return [];
+    const set = new Set<string>();
+    for (const r of rows) {
+      const v = String(r[filterKey] ?? "").trim();
+      if (v) set.add(v);
+      if (set.size > 250) break;
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [filterKey, rows]);
+
+  const data = useMemo<ChartDatum[]>(() => {
     if (!nameKey || !valueKey) return [];
 
-    const filtered = rows
+    const base: ChartDatum[] = rows
       .map((r) => {
         const name = String(r[nameKey] ?? "").trim();
         const value = toNumberLoose(r[valueKey]);
-        return { ...r, __name: name, __value: value };
+        if (!name || value == null) return null;
+
+        const grp = groupKey !== "__none__" ? normalizeGroup(r[groupKey]) : "unknown";
+        return { name, value, group: grp, raw: r };
       })
-      .filter((r: any) => {
-        if (!r.__name) return false;
-        if (r.__value == null) return false;
-        if (deleted.has(r.__name)) return false;
+      .filter(Boolean) as ChartDatum[];
 
-        if (search.trim()) {
-          const hay = `${r.__name} ${Object.values(r).join(" ")}`.toLowerCase();
-          if (!hay.includes(search.toLowerCase())) return false;
-        }
+    const filtered = base.filter((d) => {
+      if (hidden.has(d.name)) return false;
 
-        return true;
-      });
+      if (search.trim()) {
+        const hay = `${d.name} ${Object.values(d.raw).join(" ")}`.toLowerCase();
+        if (!hay.includes(search.toLowerCase())) return false;
+      }
 
-    filtered.sort((a: any, b: any) => (sortDesc ? b.__value - a.__value : a.__value - b.__value));
+      if (filterKey !== "__none__" && filterValue !== "__all__") {
+        const v = String(d.raw[filterKey] ?? "").trim();
+        if (v !== filterValue) return false;
+      }
 
+      return true;
+    });
+
+    filtered.sort((a, b) => (sortDesc ? b.value - a.value : a.value - b.value));
     return filtered;
-  }, [rows, nameKey, valueKey, deleted, search, sortDesc]);
+  }, [rows, nameKey, valueKey, groupKey, hidden, search, filterKey, filterValue, sortDesc]);
 
   const shown = useMemo(() => data.slice(0, topN), [data, topN]);
-  const max = useMemo(() => Math.max(...shown.map((r: any) => r.__value as number), 1), [shown]);
 
-  if (loading) return <div className="text-muted-foreground">Loading CSV…</div>;
+  const legendItems = useMemo(() => {
+    const seen = new Set<string>();
+    const items: { key: string; color: string }[] = [];
+    shown.forEach((d, idx) => {
+      if (seen.has(d.group)) return;
+      seen.add(d.group);
+      items.push({ key: d.group, color: getColor(d.group, idx) });
+    });
+    return items.sort((a, b) => a.key.localeCompare(b.key));
+  }, [shown]);
+
+  if (loading) return <div className="text-muted-foreground">Loading cleaned dataset…</div>;
 
   if (error) {
     return (
       <div className="space-y-2">
-        <div className="font-medium text-red-600">Couldn’t load the CSV.</div>
+        <div className="font-medium text-red-600">Couldn’t load the cleaned dataset.</div>
         <div className="text-sm text-muted-foreground">{error}</div>
         <div className="text-sm text-muted-foreground">
-          Make sure the file exists at <code>/public/sample_animals.csv</code> and restart dev server.
+          Put your cleaned CSV at <code>/public/cleaned_animals.csv</code> (served as <code>{CSV_URL}</code>).
         </div>
       </div>
     );
   }
 
+  // More bars => more width; keep it readable without overloading.
+  const minWidth = Math.max(900, shown.length * 55);
+
   return (
     <div className="space-y-4">
       {/* Controls */}
-      <div className="grid gap-3 md:grid-cols-3">
-        <Input placeholder="Search…" value={search} onChange={(e) => setSearch(e.target.value)} />
+      <div className="rounded-lg border p-3">
+        <div className="grid gap-3 md:grid-cols-4">
+          <Input placeholder="Search…" value={search} onChange={(e) => setSearch(e.target.value)} />
 
-        <Select value={nameKey} onValueChange={setNameKey}>
-          <SelectTrigger>
-            <SelectValue placeholder="Name column" />
-          </SelectTrigger>
-          <SelectContent>
-            {headers.map((h) => (
-              <SelectItem key={h} value={h}>
-                {niceLabel(h)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          <Select
+            value={filterKey}
+            onValueChange={(v) => {
+              setFilterKey(v);
+              setFilterValue("__all__");
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Filter column" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">No filter</SelectItem>
+              {filterableHeaders.map((h) => (
+                <SelectItem key={h} value={h}>
+                  {niceLabel(h)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        <Select value={valueKey} onValueChange={setValueKey}>
-          <SelectTrigger>
-            <SelectValue placeholder="Numeric column" />
-          </SelectTrigger>
-          <SelectContent>
-            {numericHeaders.map((h) => (
-              <SelectItem key={h} value={h}>
-                {niceLabel(h)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          <Select value={filterValue} onValueChange={setFilterValue} disabled={filterKey === "__none__"}>
+            <SelectTrigger>
+              <SelectValue placeholder="Filter value" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All</SelectItem>
+              {filterValues.map((v) => (
+                <SelectItem key={v} value={v}>
+                  {v}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <label className="flex w-full items-center gap-2 text-sm">
+            Bars
+            <input
+              type="range"
+              min={8}
+              max={Math.min(40, Math.max(15, data.length || 15))}
+              step={1}
+              value={topN}
+              onChange={(e) => setTopN(Number(e.target.value))}
+              className="w-full"
+            />
+            <span className="rounded border px-2 py-0.5 text-xs">{topN}</span>
+          </label>
+        </div>
+
+        <div className="mt-3 grid gap-3 md:grid-cols-4">
+          <Select value={nameKey} onValueChange={setNameKey}>
+            <SelectTrigger>
+              <SelectValue placeholder="Name column" />
+            </SelectTrigger>
+            <SelectContent>
+              {headers.map((h) => (
+                <SelectItem key={h} value={h}>
+                  {niceLabel(h)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={valueKey} onValueChange={setValueKey}>
+            <SelectTrigger>
+              <SelectValue placeholder="Value column" />
+            </SelectTrigger>
+            <SelectContent>
+              {numericHeaders.map((h) => (
+                <SelectItem key={h} value={h}>
+                  {niceLabel(h)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={groupKey} onValueChange={setGroupKey}>
+            <SelectTrigger>
+              <SelectValue placeholder="Color by (diet/type)" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">No grouping</SelectItem>
+              {filterableHeaders.map((h) => (
+                <SelectItem key={h} value={h}>
+                  {niceLabel(h)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <div className="flex items-center justify-end gap-3">
+            <Button variant="outline" onClick={() => setSortDesc((v) => !v)}>
+              <ArrowDownUp className="mr-2 h-4 w-4" />
+              Sort {sortDesc ? "high → low" : "low → high"}
+            </Button>
+
+            {hidden.size > 0 ? (
+              <Button variant="outline" onClick={() => setHidden(new Set())}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Restore ({hidden.size})
+              </Button>
+            ) : null}
+          </div>
+        </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <Button variant="outline" onClick={() => setSortDesc((v) => !v)}>
-          <ArrowDownUp className="mr-2 h-4 w-4" />
-          Sort {sortDesc ? "fast → slow" : "slow → fast"}
-        </Button>
+      {/* Legend */}
+      {legendItems.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+          {legendItems.map((it) => (
+            <div key={it.key} className="flex items-center gap-2">
+              <span className="inline-block h-3 w-3 rounded-sm" style={{ backgroundColor: it.color }} />
+              <span className="capitalize">{it.key}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
-        <label className="flex items-center gap-2 text-sm">
-          Top N
-          <input
-            type="range"
-            min={5}
-            max={Math.min(200, Math.max(20, data.length || 20))}
-            step={1}
-            value={topN}
-            onChange={(e) => setTopN(Number(e.target.value))}
-            className="w-36 accent-indigo-500"
-          />
-          <span className="rounded border px-2 py-0.5 text-xs">{topN}</span>
-        </label>
-
-        {deleted.size > 0 ? (
-          <Button variant="outline" onClick={() => setDeleted(new Set())}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Restore deleted ({deleted.size})
-          </Button>
-        ) : null}
-      </div>
-
-      <div className="h-px w-full bg-border" />
-
-      {/* Bars */}
+      {/* Chart */}
       {shown.length === 0 ? (
-        <div className="text-muted-foreground">No rows match your search / selection.</div>
+        <div className="text-muted-foreground">No rows match your current search/filter.</div>
       ) : (
-        <div className="space-y-2">
-          {shown.map((r: any) => {
-            const value = r.__value as number;
-            const pct = Math.max(2, Math.round((value / max) * 100));
-            return (
-              <div key={r.__name} className="rounded-lg border p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-medium">{r.__name}</div>
-                    <div className="text-xs text-muted-foreground">{value}</div>
-                  </div>
+        <div className="rounded-lg border p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <div className="text-sm font-medium">
+              {niceLabel(valueKey || "Value")} (Top {shown.length})
+            </div>
+            <div className="text-xs text-muted-foreground">Matching: {data.length}</div>
+          </div>
 
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => setDeleted((prev) => new Set(prev).add(r.__name))}
-                    aria-label={`Delete ${r.__name}`}
-                  >
-                    <Trash2 className="h-4 w-4 text-red-500" />
-                  </Button>
-                </div>
-
-                <div className="mt-2 h-3 w-full rounded bg-muted">
-                  <div
-                    className="h-3 rounded bg-indigo-500 transition-all"
-                    style={{ width: `${pct}%` }}
-                    title={`${value}`}
+          {/* Horizontal scroll container so labels stay readable */}
+          <div className="w-full overflow-x-auto">
+            <div style={{ width: minWidth }} className="h-[520px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={shown} margin={{ top: 12, right: 18, left: 12, bottom: 85 }} barCategoryGap={22}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="name"
+                    interval={0}
+                    angle={-30}
+                    height={85}
+                    textAnchor="end"
+                    tick={{ fontSize: 10 }}
+                    tickFormatter={(v) => truncate(String(v ?? ""), 12)}
                   />
-                </div>
-              </div>
-            );
-          })}
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(0,0,0,0.04)" }} />
+
+                  <Bar
+                    dataKey="value"
+                    // thicker bars + rounded tops
+                    barSize={26}
+                    radius={[10, 10, 2, 2]}
+                    onClick={(d: any) => {
+                      const nm = String(d?.name ?? "").trim();
+                      if (nm) setHidden((prev) => new Set(prev).add(nm));
+                    }}
+                  >
+                    {shown.map((d, idx) => (
+                      <Cell key={`${d.name}-${idx}`} fill={getColor(d.group, idx)} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="mt-2 text-xs text-muted-foreground">
+            Hover for details. Click a bar to hide it (Restore to undo). Gentle colors are based on diet/type.
+          </div>
         </div>
       )}
     </div>

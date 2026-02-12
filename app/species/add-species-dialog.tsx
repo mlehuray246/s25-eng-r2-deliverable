@@ -47,6 +47,7 @@ const defaultValues: Partial<FormData> = {
 export default function AddSpeciesDialog({ userId }: { userId: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(speciesSchema),
@@ -55,6 +56,9 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
   });
 
   const onSubmit = async (input: FormData) => {
+    if (saving) return;
+    setSaving(true);
+
     const supabase = createBrowserSupabaseClient();
 
     const { error } = await supabase.from("species").insert([
@@ -69,8 +73,9 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
       },
     ]);
 
+    setSaving(false);
+
     if (error) {
-      // no toast dependency (compile-safe)
       console.error(error);
       return;
     }
@@ -81,7 +86,7 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(v) => !saving && setOpen(v)}>
       <DialogTrigger asChild>
         <Button variant="secondary">
           <Plus className="mr-2 h-4 w-4" />
@@ -216,11 +221,11 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
               />
 
               <div className="flex">
-                <Button type="submit" className="ml-1 mr-1 flex-auto">
-                  Add Species
+                <Button type="submit" className="ml-1 mr-1 flex-auto" disabled={saving}>
+                  {saving ? "Saving…" : "Add Species"}
                 </Button>
                 <DialogClose asChild>
-                  <Button type="button" className="ml-1 mr-1 flex-auto" variant="secondary">
+                  <Button type="button" className="ml-1 mr-1 flex-auto" variant="secondary" disabled={saving}>
                     Cancel
                   </Button>
                 </DialogClose>
@@ -232,3 +237,4 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
     </Dialog>
   );
 }
+
